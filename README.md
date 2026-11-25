@@ -2,7 +2,7 @@
 
 Local Wi-Fi video from a XIAO ESP32-S3 Sense with an OV3660 camera. Power it from USB or a power bank, then open the camera in a browser. The optional Go viewer processes the image on your Mac.
 
-![Illustration of a USB-powered camera streaming a test chart to a laptop](docs/camera-demo.png)
+![Illustration of the Seeed Studio XIAO ESP32-S3 Sense with the OV3660 camera on its amber flex cable](docs/camera-demo.png)
 
 ## Connect
 
