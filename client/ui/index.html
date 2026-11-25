@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XIAO S3 Pro Stream Studio</title>
+<style>
+  :root{--bg:#090b10;--panel:#121620;--panel2:#181e2c;--border:#242c3e;--text:#eef2f7;--muted:#8a95a9;--acc:#3b82f6;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+  .layout{display:grid;grid-template-columns:1fr 330px;min-height:100vh}
+  @media(max-width:960px){.layout{grid-template-columns:1fr}}
+  .main{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .side{background:var(--panel);border-left:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-height:100vh}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  h1{margin:0;font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--bad);display:inline-block}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .card .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:18px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+  .stage{flex:1;background:#000;border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center;min-height:420px}
+  canvas#view{max-width:100%;max-height:74vh;width:auto;height:auto;display:block}
+  .hud{position:absolute;top:10px;left:10px;background:rgba(9,11,16,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 9px;font-size:11px;font-family:ui-monospace,SFMono-Regular,monospace;color:#dce4f0}
+  .section{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+  .modes{display:grid;gap:8px}
+  button.mode{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;text-align:left;cursor:pointer;transition:.15s}
+  button.mode:hover{border-color:var(--acc)}
+  button.mode.active{border-color:var(--acc);background:rgba(59,130,246,.16)}
+  button.mode .t{font-weight:600;font-size:13px;display:flex;justify-content:space-between}
+  button.mode .s{color:var(--muted);font-size:11px;margin-top:2px;display:block}
+  label.ctl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);margin-bottom:8px}
+  label.ctl .row{display:flex;justify-content:space-between;align-items:center}
+  label.ctl b{color:var(--text);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  .chk{display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:12px;color:var(--text);cursor:pointer}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 11px;cursor:pointer;font:inherit;font-size:12px}
+  .btn:hover{border-color:var(--acc)}
+  canvas#spark{width:100%;height:56px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;display:block}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="main">
+    <header>
+      <h1><span class="dot" id="dot"></span> XIAO ESP32-S3 Pro Stream Studio</h1>
+      <div class="btns">
+        <button class="btn" onclick="saveSnap()">Save Snapshot</button>
+        <button class="btn" onclick="toggleSplit()">Toggle Split Compare</button>
+        <button class="btn" onclick="camParam('vflip', lastDev.vflip ? 0 : 1)">Flip V</button>
+        <button class="btn" onclick="camParam('hmirror', lastDev.hmirror ? 0 : 1)">Mirror H</button>
+      </div>
+    </header>
+
+    <div class="metrics">
+      <div class="card"><div class="k">Client FPS</div><div class="v" id="m-fps">0.0</div></div>
+      <div class="card"><div class="k">Sensor FPS</div><div class="v" id="m-cfps">0.0</div></div>
+      <div class="card"><div class="k">Throughput</div><div class="v" id="m-mbps">0.00 Mb/s</div></div>
+      <div class="card"><div class="k">Frame Size</div><div class="v" id="m-kb">0 KB</div></div>
+      <div class="card"><div class="k">ISP Time</div><div class="v" id="m-isp">0.0 ms</div></div>
+      <div class="card"><div class="k">Chip Temp</div><div class="v" id="m-temp">—</div></div>
+      <div class="card"><div class="k">Wi-Fi RSSI</div><div class="v" id="m-rssi">—</div></div>
+    </div>
+
+    <div class="stage">
+      <canvas id="view"></canvas>
+      <div class="hud" id="hud">Connecting...</div>
+    </div>
+
+    <canvas id="spark" width="600" height="56"></canvas>
+  </div>
+
+  <aside class="side">
+    <div>
+      <div class="section">Camera Mode (Live Hardware Toggle)</div>
+      <div class="modes">
+        <button class="mode" data-mode="performance" onclick="setMode('performance')">
+          <span class="t">Performance <span>Max FPS</span></span>
+          <span class="s">Ultra-low latency, locked high frame rate</span>
+        </button>
+        <button class="mode" data-mode="balanced" onclick="setMode('balanced')">
+          <span class="t">Balanced <span>Daily Driver</span></span>
+          <span class="s">Crisp HD/XGA detail with smooth motion</span>
+        </button>
+        <button class="mode" data-mode="quality" onclick="setMode('quality')">
+          <span class="t">Quality <span>Max Detail</span></span>
+          <span class="s">High-res near-lossless frames, low noise</span>
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section">Client GPU/CPU Post-Processing (Go ISP)</div>
+      <label class="chk"><span>Enable Post-Processing</span><input type="checkbox" id="i-en" checked onchange="pushIsp()"></label>
+      <label class="chk"><span>Chroma Denoise (kills color speckle)</span><input type="checkbox" id="i-cd" checked onchange="pushIsp()"></label>
+      <label class="chk"><span>Auto Black-Level &amp; Contrast</span><input type="checkbox" id="i-al" checked onchange="pushIsp()"></label>
+      <label class="chk"><span>Auto White Balance</span><input type="checkbox" id="i-wb" checked onchange="pushIsp()"></label>
+
+      <label class="ctl"><span class="row">Temporal Noise Reduction <b id="v-tnr">0.45</b></span>
+        <input type="range" min="0" max="0.75" step="0.05" value="0.45" id="i-tnr" oninput="pushIsp()">
+      </label>
+      <label class="ctl"><span class="row">CAS Adaptive Sharpen <b id="v-sh">0.55</b></span>
+        <input type="range" min="0" max="1.0" step="0.05" value="0.55" id="i-sh" oninput="pushIsp()">
+      </label>
+      <label class="ctl"><span class="row">Saturation <b id="v-sat">1.12</b></span>
+        <input type="range" min="0.5" max="1.6" step="0.02" value="1.12" id="i-sat" oninput="pushIsp()">
+      </label>
+      <label class="ctl"><span class="row">Gamma <b id="v-gam">0.95</b></span>
+        <input type="range" min="0.7" max="1.4" step="0.02" value="0.95" id="i-gam" oninput="pushIsp()">
+      </label>
+      <label class="ctl"><span class="row">Raw / Enhanced Split % <b id="v-spl">0%</b></span>
+        <input type="range" min="0" max="95" step="5" value="0" id="i-spl" oninput="pushIsp()">
+      </label>
+    </div>
+
+    <div>
+      <div class="section">ESP32 Sensor Fine Tuning</div>
+      <label class="ctl"><span class="row">JPEG Quantization (lower = cleaner) <b id="v-cq">10</b></span>
+        <input type="range" min="4" max="32" step="1" value="10" id="c-q" onchange="camParam('quality',this.value)">
+      </label>
+      <label class="ctl"><span class="row">Exposure Bias <b id="v-cae">0</b></span>
+        <input type="range" min="-3" max="3" step="1" value="0" id="c-ae" onchange="camParam('ae_level',this.value)">
+      </label>
+      <label class="ctl"><span class="row">Sensor Denoise <b id="v-cdn">2</b></span>
+        <input type="range" min="0" max="8" step="1" value="2" id="c-dn" onchange="camParam('denoise',this.value)">
+      </label>
+      <label class="ctl"><span class="row">Sensor Sharpness <b id="v-csh">0</b></span>
+        <input type="range" min="-3" max="3" step="1" value="0" id="c-sh" onchange="camParam('sharpness',this.value)">
+      </label>
+    </div>
+  </aside>
+</div>
+
+<script>
+const canvas = document.getElementById('view');
+const ctx = canvas.getContext('2d');
+const spark = document.getElementById('spark');
+const sctx = spark.getContext('2d');
+const fpsHist = [];
+let lastDev = {};
+let busy = false;
+let lastBlobUrl = null;
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/ws');
+  ws.binaryType = 'blob';
+  ws.onopen = () => document.getElementById('dot').classList.add('on');
+  ws.onclose = () => {
+    document.getElementById('dot').classList.remove('on');
+    setTimeout(connectWS, 600);
+  };
+  ws.onmessage = async (ev) => {
+    if (busy) return;
+    busy = true;
+    try {
+      const bmp = await createImageBitmap(ev.data);
+      if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+        canvas.width = bmp.width;
+        canvas.height = bmp.height;
+      }
+      ctx.drawImage(bmp, 0, 0);
+      bmp.close();
+    } catch (e) {}
+    busy = false;
+  };
+}
+connectWS();
+
+async function setMode(m) {
+  await fetch('/api/mode?mode=' + encodeURIComponent(m), {method:'POST'});
+  poll();
+}
+async function camParam(k, v) {
+  await fetch('/api/camera?' + encodeURIComponent(k) + '=' + encodeURIComponent(v), {method:'POST'});
+  poll();
+}
+function toggleSplit() {
+  const el = document.getElementById('i-spl');
+  el.value = Number(el.value) > 0 ? 0 : 50;
+  pushIsp();
+}
+function saveSnap() {
+  const a = document.createElement('a');
+  a.download = 'xiao-frame-' + Date.now() + '.jpg';
+  a.href = canvas.toDataURL('image/jpeg', 0.95);
+  a.click();
+}
+async function pushIsp() {
+  const cfg = {
+    enabled: document.getElementById('i-en').checked,
+    chroma_denoise: document.getElementById('i-cd').checked,
+    auto_levels: document.getElementById('i-al').checked,
+    auto_wb: document.getElementById('i-wb').checked,
+    temporal_nr: Number(document.getElementById('i-tnr').value),
+    motion_thresh: 16,
+    sharpen: Number(document.getElementById('i-sh').value),
+    saturation: Number(document.getElementById('i-sat').value),
+    gamma: Number(document.getElementById('i-gam').value),
+    split_compare: Number(document.getElementById('i-spl').value),
+    out_jpeg_quality: 90
+  };
+  document.getElementById('v-tnr').textContent = cfg.temporal_nr.toFixed(2);
+  document.getElementById('v-sh').textContent = cfg.sharpen.toFixed(2);
+  document.getElementById('v-sat').textContent = cfg.saturation.toFixed(2);
+  document.getElementById('v-gam').textContent = cfg.gamma.toFixed(2);
+  document.getElementById('v-spl').textContent = cfg.split_compare + '%';
+  await fetch('/api/isp', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg)});
+}
+
+function drawSpark() {
+  const w = spark.width, h = spark.height;
+  sctx.clearRect(0, 0, w, h);
+  if (fpsHist.length < 2) return;
+  const maxV = Math.max(35, ...fpsHist) * 1.1;
+  sctx.strokeStyle = '#3b82f6';
+  sctx.lineWidth = 2;
+  sctx.beginPath();
+  fpsHist.forEach((v, i) => {
+    const x = (i / (fpsHist.length - 1)) * w;
+    const y = h - (v / maxV) * (h - 8) - 4;
+    i === 0 ? sctx.moveTo(x, y) : sctx.lineTo(x, y);
+  });
+  sctx.stroke();
+}
+
+async function poll() {
+  try {
+    const d = await (await fetch('/api/telemetry')).json();
+    const st = d.client || {};
+    const dev = d.device || {};
+    lastDev = dev;
+    document.getElementById('m-fps').textContent = (st.rx_fps || 0).toFixed(1);
+    document.getElementById('m-cfps').textContent = (dev.capture_fps || 0).toFixed(1);
+    document.getElementById('m-mbps').textContent = (st.rx_mbps || 0).toFixed(2) + ' Mb/s';
+    document.getElementById('m-kb').textContent = (st.avg_frame_kb || 0).toFixed(1) + ' KB';
+    document.getElementById('m-isp').textContent = (d.isp_ms || 0).toFixed(1) + ' ms';
+    document.getElementById('m-temp').textContent = dev.temp_c ? dev.temp_c.toFixed(1) + '°C' : '—';
+    document.getElementById('m-rssi').textContent = dev.wifi_mode === 'AP' ? 'AP' : (dev.rssi ? dev.rssi + ' dBm' : '—');
+    document.getElementById('hud').textContent =
+      `${(dev.mode || st.mode || '?').toUpperCase()} · ${st.width || dev.width || 0}x${st.height || dev.height || 0} Q=${st.quality || dev.quality || 0} · ${(st.rx_fps || 0).toFixed(1)} FPS · Jitter ${(st.jitter_ms || 0).toFixed(1)}ms`;
+    document.querySelectorAll('button.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === dev.mode));
+    if (dev.quality) { document.getElementById('c-q').value = dev.quality; document.getElementById('v-cq').textContent = dev.quality; }
+    if (dev.ae_level !== undefined) { document.getElementById('c-ae').value = dev.ae_level; document.getElementById('v-cae').textContent = dev.ae_level; }
+    if (dev.denoise !== undefined) { document.getElementById('c-dn').value = dev.denoise; document.getElementById('v-cdn').textContent = dev.denoise; }
+    if (dev.sharpness !== undefined) { document.getElementById('c-sh').value = dev.sharpness; document.getElementById('v-csh').textContent = dev.sharpness; }
+    fpsHist.push(st.rx_fps || 0);
+    if (fpsHist.length > 90) fpsHist.shift();
+    drawSpark();
+  } catch (e) {}
+}
+poll();
+setInterval(poll, 600);
+</script>
+</body>
+</html>

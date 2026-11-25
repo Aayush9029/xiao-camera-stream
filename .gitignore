@@ -1,0 +1,5 @@
+firmware/xiao_stream/wifi_private.h
+.DS_Store
+client/xiao-client
+client/bench_*/
+tools/screen_test
