@@ -1,0 +1,5 @@
+/.build/
+/.swiftpm/
+/XiaoCam.app/
+/Icon.icns
+*.swp

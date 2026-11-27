@@ -23,7 +23,27 @@ Switch modes in the viewer. For a still, open `/capture` on the camera. For a di
 
 *Quality mode on the bench. Original frame on the left, Mac processing on the right.*
 
-## Run the Mac viewer
+## Mac app and agent CLI
+
+XiaoCam is a menu bar app in `mac/`. It shows the live camera, and its `xiaocam` command lets a coding agent see through the camera.
+
+```sh
+cd mac
+./Scripts/compile_and_run.sh
+```
+
+Install the command and the agent skill from Settings > Agents. Then:
+
+```sh
+xiaocam snap                      # one photo, prints the file path
+xiaocam grid --every 5 --for 30   # photos over time in one image
+xiaocam clip --for 10             # a short video
+xiaocam mode quality              # performance, balanced, or quality
+```
+
+The skill is in `skills/xiaocam/SKILL.md`. Without the app, get a photo with `curl -s http://CAMERA_IP/capture -o frame.jpg`.
+
+## Run the Go viewer
 
 From the project root, replace `CAMERA_IP` with the board’s address. Open http://127.0.0.1:8090 after launch.
 
