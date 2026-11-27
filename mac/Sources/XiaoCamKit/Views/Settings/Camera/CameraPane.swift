@@ -3,47 +3,28 @@ import SwiftUI
 struct CameraPane: View {
     let model: CameraModel
 
-    private let adjustments: [CameraSetting] = [.brightness, .contrast, .saturation, .sharpness, .denoise, .aeLevel]
-    private let switches: [CameraSetting] = [.nightMode, .hmirror, .vflip]
+    @State private var controlsHeight: CGFloat = 0
+    @State private var paneWidth: CGFloat = 0
+
+    private let controlsWidth: CGFloat = 236
+    private let spacing: CGFloat = 16
+    private let margin: CGFloat = 20
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            CameraFeedColumn(model: model)
-
-            ScrollView {
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        ForEach(switches) { setting in
-                            ToggleTile(
-                                title: setting.title,
-                                systemImage: setting.symbol,
-                                isOn: model.status?.value(for: setting) == 1,
-                                isEnabled: isLive
-                            ) { isOn in
-                                Task { await model.settingChanged(setting, to: isOn ? 1 : 0) }
-                            }
-                        }
-                    }
-                    ForEach(adjustments) { setting in
-                        SliderTile(
-                            title: setting.title,
-                            range: setting.range,
-                            value: model.status?.value(for: setting) ?? 0,
-                            isEnabled: isLive
-                        ) { value in
-                            Task { await model.settingChanged(setting, to: value) }
-                        }
-                    }
-                }
-            }
-            .scrollIndicators(.never)
-            .frame(width: 236)
+        HStack(alignment: .top, spacing: spacing) {
+            CameraFeedColumn(model: model, height: controlsHeight, maxWidth: feedMaxWidth)
+            CameraControlsColumn(model: model)
+                .frame(width: controlsWidth)
+                .onGeometryChange(for: CGFloat.self, of: \.size.height) { controlsHeight = $0 }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, margin)
+        .padding(.bottom, margin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { paneWidth = $0 }
         .task { await model.streamWhileVisible() }
     }
 
-    private var isLive: Bool { model.connectionState.is(\.live) }
+    private var feedMaxWidth: CGFloat {
+        max(paneWidth - margin * 2 - spacing - controlsWidth, 0)
+    }
 }

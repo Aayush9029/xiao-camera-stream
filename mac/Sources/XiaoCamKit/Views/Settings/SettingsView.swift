@@ -32,7 +32,7 @@ public struct SettingsView: View {
                 }
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 660, minHeight: 440)
+        .frame(minWidth: 660, minHeight: 400)
     }
 
     private var currentTab: SettingsTab { navigation.tab ?? .general }
